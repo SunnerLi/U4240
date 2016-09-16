@@ -54,8 +54,7 @@ def Load(csvName="test.csv"):
 def GenerateByF():
     """
         Generate the give list by F
-        If Her salary > 30000,
-            give the cradit
+        If Her/His salary > 30000, give the cradit
     """
     global give
 
@@ -67,7 +66,7 @@ def GenerateByF():
 
 def Perceptron():
     """
-        perceptron algorithm
+        Perceptron algorithm
     """
     global weight
     global give
