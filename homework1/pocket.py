@@ -1,4 +1,4 @@
-from matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 from homework15_IO import *
 from homework16 import *
 import numpy as np
@@ -43,13 +43,20 @@ def pocketDraw(title, array):
     """
         Draw the histogram toward the pocket algorithm result
 
-        Arg:    The 
+        Arg:    The diagram title and the result array
     """
+    plt.hist(array)
+    plt.title(title)
+    plt.xlabel("Error Rate")
+    plt.ylabel("Times")
+    plt.show()
 
-def pocket(X, Y, XTest, YTest, eta=1, updateTime=100, skipValid=False,
+def pocket(X, Y, XTest, YTest, eta=1, updateTime=50, skipValid=False,
         validate_type=Use_Testing_Dataset_To_Validate):
     """
         Implement the pocket algorithm
+        This function would make the index to origin if there's wrong,
+        thus it can get more less error rate
 
         Arg:    The input data, the tag, the learning rate,
                 The update round time and the type of the dataset to validate
@@ -92,6 +99,8 @@ def pocket2(X, Y, XTest, YTest, eta=1, updateTime=50, skipValid=False,
         validate_type=Use_Testing_Dataset_To_Validate):
     """
         Implement the pocket algorithm
+        This function wouldn't go back to the origin until to the end,
+        thus the speed is more fast
 
         Arg:    The input data, the tag, the learning rate,
                 The update round time and the type of the dataset to validate
@@ -103,22 +112,6 @@ def pocket2(X, Y, XTest, YTest, eta=1, updateTime=50, skipValid=False,
     updateCount = 0
 
     # Pocket algorithm
-    """
-    for i in range(len(X)):
-        Xi = np.array(X[i])
-        if not sign(np.dot(Xi, W)) == Y[i]:
-            W = W + eta * Xi * Y[i]
-            if not skipValid:
-                if validate(X, Y, WPocket, XTest, YTest, W) == Better:
-                    WPocket = W
-            else:
-                WPocket = W
-
-            # If go up to the update limit
-            updateCount += 1
-            if not updateCount >= updateTime:
-                i = 0
-    """
     index = 0
     while updateCount < updateTime:
         Xi = np.array(X[index])
@@ -146,8 +139,7 @@ def pocket2(X, Y, XTest, YTest, eta=1, updateTime=50, skipValid=False,
                 minCount += 1
     return float(minCount) / 500
 
-"""
-if __name__ == "__main__":
+def test():
     # Variable
     errors = []
     WPocket = None
@@ -161,4 +153,3 @@ if __name__ == "__main__":
         errors.append(error)
     print "Error Rate: ", float( np.sum(np.array(errors)) / 200 ) 
     draw("Error Rate", errors)
-"""
