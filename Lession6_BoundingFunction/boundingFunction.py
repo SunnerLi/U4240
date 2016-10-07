@@ -20,7 +20,11 @@ stack = Stack()
 # The list to store the combination about the value of the points
 chooseList = []
 
-# Variable in the table of bounding function
+"""
+    Variable in the table of bounding function
+    N   - The range that the value would reach,
+    K   - The length of the each pair
+"""
 N = 6
 K = 5
     
@@ -34,9 +38,7 @@ def combination(i=1):
             [3, 4]
         ]
 
-        Arg:    The base of the data that would be push,
-                The range that the value would reach,
-                The length of the each pair
+        Arg:    The base of the data that would be push
         Ret:    None
     """
     global stack, chooseList
