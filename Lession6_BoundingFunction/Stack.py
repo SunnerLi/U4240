@@ -12,7 +12,7 @@ class Stack():
     def push(self, i):
         self.stackNum.append(i)
 
-    def pop(self, ):
+    def pop(self):
         a = self.stackNum[-1]
         self.stackNum = self.stackNum[:len(self.stackNum)-1]
         return a
