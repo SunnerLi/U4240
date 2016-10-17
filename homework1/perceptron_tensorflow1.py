@@ -1,18 +1,33 @@
+import matplotlib.pyplot as plt
 from datetime import datetime
 import tensorflow as tf
 import numpy as np
-import pylab
 
-dimNumber = 3
-rowNumber = 7
-batchSize = 1
-_error = 0.0001
-biasNumber = 0
+"""
+    This program shows the single perceptron algorithm with tensorflow
+    As the PLA's concept, one validation vector was sent to be checked each time.
+    As the result, the batch size is 1. 
+    At last, we would show the result of training.
 
+    * In this program, the learning rate is 1.0
+    * The picture is drawn by pyplot
+    
+    Author: SunnerLi
+    Finish: 17/10/2016
+"""
+# variable
+dimNumber = 3   # The dimention of the row (include bias)
+rowNumber = 8   # The number of the whole row
+batchSize = 1   # The validation size in each iteration
+
+# x & y
 data  = np.ndarray([rowNumber, dimNumber], dtype=float)
 label = np.ndarray([rowNumber], dtype=float)
 
 def read():
+    """
+        Read the file and change the contain as the corresponding format
+    """
     global data
     global label
     count = 0      
@@ -25,24 +40,26 @@ def read():
             data[count][i] = rawRow[i]
         data[count][2] = 0
         label[count] = rawRow[dimNumber-1]
-        print "Data: ", data[count], '\t\tlabel: ', label[count]
         count += 1
 
-def generateBatch(index=-1):
-    np.random.seed(0)
-    if index == -1:
-        _data = np.random.choice(rowNumber, batchSize)
-        _label = np.asarray([ label[x] for x in xrange(batchSize) ])
-        _data = np.asarray([ data[x] for x in xrange(batchSize) ])
-    else:
-        _label = np.ndarray([batchSize], dtype=float)
-        _label[0] = label[index]
-        _data = np.ndarray([batchSize, dimNumber], dtype=float)
-        _data[0] = data[index]
-        print "shape: ", np.shape(_data)
+def generateBatch(index):
+    """
+        Generate the batch data for the specific index
+
+        Arg:    The index whose data want to be generated
+        Ret:    The corresponding x & y
+    """
+    _label = np.ndarray([batchSize], dtype=float)
+    _data = np.ndarray([batchSize, dimNumber], dtype=float)
+    _label[0] = label[index]
+    _data[0] = data[index]
     return _data, _label
 
 def work():
+    """
+        Define the tensorflow and run the whole process
+        The process includes training and validation
+    """
     # Define network
     graph = tf.Graph()
     with graph.as_default():
@@ -51,8 +68,7 @@ def work():
         trainY = tf.placeholder(tf.float32, shape=[batchSize], name="Y")
 
         # Define the weight and the flow process
-        #w = tf.Variable(tf.random_normal([dimNumber, 1]), dtype=tf.float32)
-        w = tf.Variable(np.asarray([[1], [1], [-5]]), dtype=tf.float32)
+        w = tf.Variable(tf.random_normal([dimNumber, 1]), dtype=tf.float32)
         y = tf.sign(tf.matmul(trainX, w))
 
         # Define the loss function and the optimization function
@@ -60,60 +76,50 @@ def work():
         optimizer = tf.train.GradientDescentOptimizer(0.01).minimize(loss)
 
         # Define the update process
-        mix = tf.transpose(loss * trainX)
-        update = tf.assign(w, tf.add(w, mix))
+        revised = tf.transpose(loss * trainX)
+        update = tf.assign(w, tf.add(w, revised))
+
+        # Initial at last
         init = tf.initialize_all_variables()
 
     # Train
-    iteration = 5
+    iteration = 10
     with tf.Session(graph=graph) as session:
         init.run()
-        for i in xrange(iteration):              # The maximum iteration
-            allRight = True
+        for i in xrange(iteration):                 # The maximum iteration
+            allRight = True                         # Initial checking flag
 
             # Test all training data
-            for j in xrange(len(data)):     # The testing of each epoch
+            for j in xrange(len(data)):             # The testing of each epoch
                 X, Y = generateBatch(j)
-                print "X: ", X
-                print "Y: ", Y
                 feed_dict = {trainX: X, trainY: Y}
                 _op, _loss = session.run([optimizer, loss], feed_dict=feed_dict)
                 if not _loss == 0.0:
                     allRight = False
-                    print "loss:", _loss
-                    print "mix: ", mix.eval(feed_dict=feed_dict)
                     update.eval(feed_dict=feed_dict)
-                    print "W': ", w.eval()
-                else:
-                    print "Y': ", y.eval(feed_dict=feed_dict)
-                    print "No error"
 
             # print log
             if i % 500 == 0:
                 print "w: ", w
-                print "mix: ", tf.shape(mix)
                 print "iter: ", i, "\tloss: ", _loss
             if allRight:
                 break
-        print "Done, iter: ", i
 
-        print "final W: ", w.eval()
+        # Save the result
+        print "Done, iter: ", i
         saver = tf.train.Saver()
-        saver.save(session, 'model.ckpt', global_step=iteration)
+        saver.save(session, 'perceptron_model.ckpt', global_step=iteration)
 
     # Validate
     predicts = []
     print("----- Validation -----")
     with tf.Session(graph=graph) as session:
-        saver.restore(session, 'model.ckpt-5')
-        print "init W: ", w.eval()
+        modelName = 'perceptron_model.ckpt-' + str(iteration)
+        saver.restore(session, modelName)
         for i in range(rowNumber):
             xValid, yValid = generateBatch(i)
             feed_dict = {trainX: xValid, trainY: yValid}
-            print "X:  ", xValid
-            print "Y:  ", yValid
             predicts.append(y.eval(feed_dict=feed_dict))
-            print "Y': ", y.eval(feed_dict=feed_dict)
     draw(predicts)
 
 def draw(_list):
@@ -122,16 +128,32 @@ def draw(_list):
 
         Arg:    The predicted result list
     """
-    print "_list: ", _list
+    # Define multi-plots
+    figure, (plot1, plot2) = plt.subplots(1, 2, sharey=True)
+
+    # Draw origin plot
+    for i in range(len(data)-1):
+        if label[i] == 1:
+            plot1.plot([data[i][0]], [data[i][1]], 'or', color='g')
+        else:
+            plot1.plot([data[i][0]], [data[i][1]], 'or', color='r') 
+    plot1.set_xlim([-1, 5])
+    plot1.set_ylim([-1, 5])
+    plot1.set_title("Before Training")   
+
+    # Draw result plot
     for i in range(len(data)-1):
         if _list[i] == 1:
-            pylab.plot([data[i][0]], [data[i][1]], 'or', color='g')
+            plot2.plot([data[i][0]], [data[i][1]], 'or', color='g')
         else:
-            pylab.plot([data[i][0]], [data[i][1]], 'or', color='r')
-    pylab.xlim([-1, 5])
-    pylab.ylim([-1, 5])
-    pylab.show()
+            plot2.plot([data[i][0]], [data[i][1]], 'or', color='r')    
+    plot2.set_xlim([-1, 5])
+    plot2.set_ylim([-1, 5])
+    plot2.set_title("After Training")
 
-read()
-generateBatch()
-work()
+    # Show
+    plt.show()
+
+if __name__ == "__main__":
+    read()
+    work()
