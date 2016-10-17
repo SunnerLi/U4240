@@ -76,4 +76,5 @@ def pla(X, Y, eta=1, continue_if_wrong=False):
                     break
         if noChange:
             break
+    print "Weight: ", W
     return epoch+1
