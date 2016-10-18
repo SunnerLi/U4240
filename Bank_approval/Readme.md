@@ -1,7 +1,7 @@
 # Load(Bank) Approval problem
 
 <p align="center">
-  <img src="https://github.com/SunnerLi/U4240/Bank_approval/img.png"/>
+  <img src="https://github.com/SunnerLi/U4240/blob/master/Bank_approval/img.png"/>
 </p> 
 
 Abstract
