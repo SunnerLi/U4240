@@ -1,0 +1,2 @@
+model_checkpoint_path: "bank.cpkt"
+all_model_checkpoint_paths: "bank.cpkt"
