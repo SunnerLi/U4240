@@ -7,9 +7,9 @@ import math
 import cPickle
 
 # Constant
-MAX = 100000000
-chooseNumber = 1000000    # The number of the common words we want to choose
-batch_size = 80
+MAX = 10000000000000
+chooseNumber = 500000   # The number of the common words we want to choose
+batch_size = 256
 embedding_size = 80    # Dimension of the embedding vector.
 skip_window = 1         # How many words to consider left and right.
 num_skips = 2           # How many times to reuse an input to generate a label.
@@ -19,7 +19,7 @@ loss_sum  = 0           # The sum of the loss
 valid_size = 2          # The number of the words that are choosed to evaluate similarity
 valid_window = 500      # The maximun length to choose for validation
 valid_sample = [0, 0]
-num_sample = 64         # The number of the words that are choose to evaluate the model
+num_sample = 128         # The number of the words that are choose to evaluate the model
 
 # The word data variables
 words = list()          # The whole word list
@@ -27,8 +27,8 @@ freqs = None            # The frequency of each words
 mapping = dict()        # word  -> index
 batchIndex = 0          # Batch index to generate batch data
 modelName = './model.ckpt'
-iteration = 100000
-printThreshold = 500
+iteration = 20
+printThreshold = 2000
 
 graph = tf.Graph()
 
@@ -139,7 +139,7 @@ def buildTensorflow():
         placeHolder["Y"] = tf.placeholder(tf.int32, shape=[batch_size, 1])
 
         # W
-        W["word_embedded"] = tf.Variable(tf.random_normal([chooseNumber, batch_size], -1.0, 1.0))
+        W["word_embedded"] = tf.Variable(tf.random_normal([chooseNumber, embedding_size], -1.0, 1.0))
         W["H"] = tf.nn.embedding_lookup(W["word_embedded"], placeHolder["X"])
 
         # W'
@@ -160,7 +160,7 @@ def buildTensorflow():
 
 def train():
     with tf.Session(graph=graph) as session:
-        with tf.device("/gpu:0"):
+        with tf.device("/cpu:0"):
             tf.initialize_all_variables().run()
             print "--< Word Embedded>-- Initialize "
 
