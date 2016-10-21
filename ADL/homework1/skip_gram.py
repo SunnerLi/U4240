@@ -1,3 +1,4 @@
+from wordVectorDump import dump 
 import tensorflow as tf
 import numpy as np
 import collections
@@ -7,7 +8,7 @@ import cPickle
 
 # Constant
 MAX = 100000000
-chooseNumber = 100000    # The number of the common words we want to choose
+chooseNumber = 1000000    # The number of the common words we want to choose
 batch_size = 80
 embedding_size = 80    # Dimension of the embedding vector.
 skip_window = 1         # How many words to consider left and right.
@@ -26,7 +27,7 @@ freqs = None            # The frequency of each words
 mapping = dict()        # word  -> index
 batchIndex = 0          # Batch index to generate batch data
 modelName = './model.ckpt'
-iteration = 600000
+iteration = 100000
 printThreshold = 500
 
 graph = tf.Graph()
@@ -159,7 +160,7 @@ def buildTensorflow():
 
 def train():
     with tf.Session(graph=graph) as session:
-        with tf.device("/cpu:0"):
+        with tf.device("/gpu:0"):
             tf.initialize_all_variables().run()
             print "--< Word Embedded>-- Initialize "
 
@@ -169,7 +170,7 @@ def train():
                 #print "iteration: ", i
                 _, _loss = session.run([optimizer, loss], feed_dict=feed_dict)
                 printLoss(i, _loss)
-            tf.train.Saver().save(session, modelName, global_step=iteration)
+        tf.train.Saver().save(session, modelName, global_step=iteration)
 
 def val(string1, string2):
     global valid_sample
@@ -208,28 +209,6 @@ def printLoss(iteration, loss):
 
 def dumpVector():
     global graph
-    """
-    with open('wordVec.txt', 'w') as f:
-        with tf.Session(graph=graph) as session:
-            saver = tf.train.Saver()
-            saver.restore(session, modelName + '-' + str(iteration))
-            
-            for i in range(1, 10000):
-                print "word index: ", i
-                # Get the word and the vector
-                _string = get(mapping, i)
-                embedded = tf.nn.embedding_lookup(W["word_embedded"], [i])
-                _vector = embedded.eval()
-                _vector = _vector[0]
-
-                # Write into file
-                for i in range(len(_vector)):
-                    _string = _string + ' ' + str(_vector[i])
-                _string += '\n'
-                f.write(_string)
-    """
-    
-    
     vectors = np.ndarray([chooseNumber, embedding_size])
     with tf.Session(graph=graph) as session:
         saver = tf.train.Saver()
@@ -237,36 +216,7 @@ def dumpVector():
         emTensor = W["word_embedded"].eval()
     cPickle.dump(emTensor, open("embedded.pkl", 'w'))
     cPickle.dump(mapping, open("mapping.pkl", 'w'))
-
-    """
-    with open('wordVec.txt', 'w') as f:
-        for i in range(1, chooseNumber):
-            # Get the word and the vector
-            print "write word index: ", i
-            _string = get(mapping, i)
-            _vector = vectors[i]
-
-            # Write into file
-            for i in range(len(_vector)):
-                _string = _string + ' ' + str(_vector[i])
-            _string += '\n'
-            f.write(_string)
-    """
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    dump()
 
 if __name__ == "__main__":
     buildDataset()
