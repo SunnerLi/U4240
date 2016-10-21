@@ -7,7 +7,7 @@ import math
 # Constant
 MAX = 100000000
 chooseNumber = 50000    # The number of the common words we want to choose
-batch_size = 128
+batch_size = 1
 embedding_size = 128    # Dimension of the embedding vector.
 skip_window = 1         # How many words to consider left and right.
 num_skips = 2           # How many times to reuse an input to generate a label.
@@ -24,6 +24,8 @@ words = list()            # The whole word list
 freqs = None             # The frequency of each words
 mapping = dict()        # word  -> index
 batchIndex = 0          # Batch index to generate batch data
+modelName = './model.ckpt'
+iteration = 200
 
 def get(dictionary, value):
     for _key in dictionary:
@@ -43,7 +45,7 @@ def buildDataset():
     string = f.read()
     f.close()
     freqs = string.split(' ')
-    freqs = collections.Counter(freqs).most_common(chooseNumber)
+    freqs = collections.Counter(freqs).most_common(chooseNumber-1)
     freqs = [['UNDEFINE', 1]] + freqs
 
     # Build the mapping
@@ -104,11 +106,12 @@ def generateBatch(batchSize, repTime, relativeLength):
     return data, label
 
 def buildTensorflow():
+    global modelName
     graph = tf.Graph()
 
     with graph.as_default():# set as default graph
         trainX = tf.placeholder(tf.int32, shape=[batch_size])
-        trainY = tf.placeholder(tf.int32, shape=[batch_size, 1])
+        trainY = tf.placeholder(tf.float32, shape=[])
 
         with tf.device("/cpu:0"):
             # W
@@ -117,45 +120,49 @@ def buildTensorflow():
 
             # W'
             #nsWeight = tf.Variable(tf.truncated_normal([batch_size, chooseNumber], -1.0, 1.0))
-            nsWeight = tf.Variable( tf.truncated_normal( [chooseNumber, embedding_size], stddev=1.0 / math.sqrt(embedding_size) ) )
-            nsBias = tf.Variable(tf.zeros([chooseNumber]))
+            #nsWeight = tf.Variable( tf.truncated_normal( [chooseNumber, embedding_size], stddev=1.0 / math.sqrt(embedding_size) ) )
+            #nsBias = tf.Variable(tf.zeros([chooseNumber]))
+            context = tf.Variable(tf.random_normal([batch_size, chooseNumber], -1.0, 1.0))
+            out = tf.nn.softmax( tf.mul(H, context ) )
 
         # Define the negation sampling loss function
-        loss = tf.reduce_mean(tf.nn.nce_loss(nsWeight, nsBias, H, trainY, num_sample, chooseNumber))
+        #loss = tf.reduce_mean(tf.nn.nce_loss(nsWeight, nsBias, H, trainY, num_sample, chooseNumber))
+        loss = tf.nn.sigmoid_cross_entropy_with_logits( tf.reduce_sum(out), trainY)
 
         # Declare the optimize stradegy
-        optimizer = tf.train.GradientDescentOptimizer(1.0).minimize(loss)
+        optimizer = tf.train.GradientDescentOptimizer(0.1).minimize(loss)
 
         
         init = tf.initialize_all_variables()
 
     # Start to train
-    iteration = 5000
+    
     with tf.Session(graph=graph) as session:
         init.run()
         print "--< Word Embedded>-- Initialize "
 
         for i in range(iteration):
             X, Y = generateBatch(batch_size, num_skips, skip_window)
-            feed_dict = {trainX: X, trainY: Y}
+            feed_dict = {trainX: X, trainY: Y[0][0]}
             #print "iteration: ", i
             _, _loss = session.run([optimizer, loss], feed_dict=feed_dict)
             printLoss(i, _loss)
-        tf.train.Saver().save(session, "model.ckpt", global_step=iteration)
+        tf.train.Saver().save(session, modelName, global_step=iteration)
 
 def printLoss(iteration, loss):
     global loss_sum
     loss_sum += loss
     if iteration % 500 == 499:
-        print "--< Word Embedded>-- Average loss: ", loss_sum / 2000
+        print "--< Word Embedded>-- Iter: ", iteration, "Average loss: ", loss_sum / 2000
         loss_sum = 0
 
 def val(string1, string2):
     global valid_sample
+    global modelName
+    global iteration
     valid_sample = [mapping[string1], mapping[string2]]
 
     graph = tf.Graph()
-
     with graph.as_default():# set as default graph
         trainX = tf.placeholder(tf.int32, shape=[batch_size])
         trainY = tf.placeholder(tf.int32, shape=[batch_size, 1])
@@ -184,10 +191,9 @@ def val(string1, string2):
         init = tf.initialize_all_variables()
 
     # Start to train
-    iteration = 2000
     with tf.Session(graph=graph) as session:
         saver = tf.train.Saver()
-        saver.restore(session, './model.ckpt-2000')
+        saver.restore(session, modelName + '-' + str(iteration))
         print "done"
 
         # Generate the testing data
@@ -210,5 +216,6 @@ def val(string1, string2):
 
 if __name__ == "__main__":
     buildDataset()
+    buildTensorflow()
     print get(mapping, 1000)
-    val('square', 'town')
+    #val('is', 'are')
