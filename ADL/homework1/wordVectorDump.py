@@ -19,3 +19,5 @@ def dump():
                 _string = _string + ' ' + str(vectors[i][j])
             _string += '\n'
             f.write(_string)
+
+dump()
