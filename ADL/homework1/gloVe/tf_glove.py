@@ -1,15 +1,37 @@
 from __future__ import division
 from collections import Counter, defaultdict
-import os
 from random import shuffle
 import tensorflow as tf
+import numpy as np
 import cPickle
+import os
 
+"""
+    The core implementation of the GloVe word model
+
+    Revise: SunnerLi (Not first author)
+    Finish: 23/10/2016
+"""
+
+vocabLimit = 5000000        # The number of limit that should save the period result
+mixTime = 1                 # The repeat time that want to eliminate the influence of seperation (Should >= 1)
 
 class NotTrainedError(Exception):
     pass
 
 class NotFitToCorpusError(Exception):
+    pass
+
+class FileNotFoundError(Exception):
+    """
+        If the .pkl file isn't exist, it would be raised
+    """
+    pass
+
+class SaveFileNotSuccessfulError(Exception):
+    """
+        If the .pkl file didn't store correctly, it would be raised
+    """
     pass
 
 class GloVeModel():
@@ -32,22 +54,41 @@ class GloVeModel():
         self.__word_to_id = None
         self.__cooccurrence_matrix = None
         self.__embeddings = None
+        self.__wantSplit = False
+        self.__numberOfSplitOcc = 0
 
-    def fit_to_corpus(self, corpus):
-        self.__fit_to_corpus(corpus, self.max_vocab_size, self.min_occurrences,
-                             self.left_context, self.right_context)
+    def fit_to_corpus(self, corpus, split=False):
+        """
+            Deal with the corpus
+
+            Arg:    corpus  - The list of the corpus vocabularies
+                    split   - If you want to split the result (low-ability computer suggest)
+        """
+        self.__wantSplit = split
+        self.__fit_to_corpus(corpus, self.max_vocab_size, self.min_occurrences, self.left_context, self.right_context)
         self.__build_graph()
 
     def __fit_to_corpus(self, corpus, vocab_size, min_occurrences, left_size, right_size):
+        """
+            Statistic the frequency and store the result
+
+            Arg:    corpus          - The list of the corpus vocabularies
+                    vocab_size      - The maximun number of common vocabulary want to choose
+                    min_occurrences - if the would didn't appear over this limit, ignore it
+                    left_size       - The M/2 on the left (half window size)
+                    right_size      - The M/2 on the right (half window size)
+        """
+        # Initialize
         word_counts = Counter()
         cooccurrence_counts = defaultdict(float)
         
+        # Scan the corpus and statistic the frequency
         for region in corpus:
             word_counts.update(region)
             countAlpha = 0
             for l_context, word, r_context in _context_windows(region, left_size, right_size):
                 if countAlpha % 10000 == 0:
-                    print "Need to deal with: ", len(region) - countAlpha
+                    print "<GloVe>-- ", "Number of words isn't scanned: ", len(region) - countAlpha
                 for i, context_word in enumerate(l_context[::-1]):
                     # add (1 / distance from focal word) for this pair
                     cooccurrence_counts[(word, context_word)] += 1 / (i + 1)
@@ -59,45 +100,107 @@ class GloVeModel():
         self.__words = [word for word, count in word_counts.most_common(vocab_size)
                         if count >= min_occurrences]
         self.__word_to_id = {word: i for i, word in enumerate(self.__words)}
-        self.__cooccurrence_matrix = {
-            (self.__word_to_id[words[0]], self.__word_to_id[words[1]]): count
-            for words, count in cooccurrence_counts.items()
-            if words[0] in self.__word_to_id and words[1] in self.__word_to_id}
-        print "done"
-        print type(self.__cooccurrence_matrix)
+
+        # Split(store) the data or not
+        if self.__wantSplit == True:
+            cPickle.dump(self.__words, open("glove_words.pkl", 'w'))
+            cPickle.dump(self.__word_to_id, open("glove_id.pkl", 'w'))
+            cPickle.dump(cooccurrence_counts, open("glove_count.pkl", 'w'))
+            cooccurrence_counts = None
+        else:
+            print "<GloVe>-- ", "Co-occurence size: ", len(cooccurrence_counts)
+            self.__cooccurrence_matrix = {
+                (self.__word_to_id[words[0]], self.__word_to_id[words[1]]): count
+                for words, count in cooccurrence_counts.items()
+                if words[0] in self.__word_to_id and words[1] in self.__word_to_id}     
+
+    def buils_matrix(self):
+        """
+            Build the co-occurence matrix
+        """
+        if os.path.isfile("glove_words.pkl") and os.path.isfile("glove_id.pkl") and os.path.isfile("glove_count.pkl"):
+            # Load the statistic element
+            if self.__words == None:
+                self.__words = cPickle.load(open("glove_words.pkl", 'r'))
+            if self.__word_to_id == None:
+                self.__word_to_id = cPickle.load(open("glove_id.pkl", 'r'))
+            cooccurrence_counts = cPickle.load(open("glove_count.pkl", 'r'))
+            print "<GloVe>-- ", "Co-occurence size: ", len(cooccurrence_counts)
+
+            # Statistic the frequency
+            self.__cooccurrence_matrix = dict()
+            storeIndex = 0
+            for words, count in cooccurrence_counts.items():
+                # If the both word is represent, then record the element
+                if words[0] in self.__word_to_id and words[1] in self.__word_to_id:
+                    _key = (self.__word_to_id[words[0]], self.__word_to_id[words[1]])
+                    self.__cooccurrence_matrix[_key] = count
+
+                    # Clear the whole matrix if it's over limit
+                    if len(self.__cooccurrence_matrix) >= vocabLimit:
+                        _fileName = "glove_occ.pkl-" + str(storeIndex)
+                        print "<GloVe>-- ", "Save " + _fileName
+                        cPickle.dump(self.__cooccurrence_matrix, open(_fileName, 'w'))
+                        self.__cooccurrence_matrix = dict()
+                        if not os.path.isfile(_fileName):
+                            raise SaveFileNotSuccessfulError("didn't save ", _fileName)
+                        storeIndex += 1
+
+                # Print the progress
+                if len(self.__cooccurrence_matrix) % 500000 == 0:
+                    print "<GloVe>-- ", "Split part: ", storeIndex, \
+                        "\tdict number: ", len(self.__cooccurrence_matrix), "Rest: ", \
+                        max(0, len(cooccurrence_counts) - (storeIndex) * 5000000 - len(self.__cooccurrence_matrix))
+
+            # Store the last
+            print "<GloVe>-- ", "Save glove_occ.pkl-"+ str(storeIndex)
+            cPickle.dump(self.__cooccurrence_matrix, open("glove_occ.pkl-" + str(storeIndex), 'w'))
+            self.__cooccurrence_matrix = dict()
+            self.__numberOfSplitOcc = storeIndex+1
+        else:
+            raise FileNotFoundError("No found the split file, try to train again!")
+
 
     def __build_graph(self):
+        """
+            Build the tensorflow graph
+        """
         self.__graph = tf.Graph()
         with self.__graph.as_default(), self.__graph.device(_device_for_node):
             count_max = tf.constant([self.cooccurrence_cap], dtype=tf.float32,
                                     name='max_cooccurrence_count')
             scaling_factor = tf.constant([self.scaling_factor], dtype=tf.float32,
                                          name="scaling_factor")
-            print "build placeholder"           
+            
+            # Declare place holder
+            print "<GloVe>-- ", "build placeholder"           
             self.__focal_input = tf.placeholder(tf.int32, shape=[self.batch_size],
                                                 name="focal_words")
             self.__context_input = tf.placeholder(tf.int32, shape=[self.batch_size],
                                                   name="context_words")
             self.__cooccurrence_count = tf.placeholder(tf.float32, shape=[self.batch_size],
                                                        name="cooccurrence_count")
-            print "build weight"
+
+            # Declare weight and bias
+            print "<GloVe>-- ", "build weight"
             focal_embeddings = tf.Variable(
                 tf.random_uniform([self.vocab_size, self.embedding_size], 1.0, -1.0),
                 name="focal_embeddings")
             context_embeddings = tf.Variable(
                 tf.random_uniform([self.vocab_size, self.embedding_size], 1.0, -1.0),
                 name="context_embeddings")
-
             focal_biases = tf.Variable(tf.random_uniform([self.vocab_size], 1.0, -1.0),
                                        name='focal_biases')
             context_biases = tf.Variable(tf.random_uniform([self.vocab_size], 1.0, -1.0),
                                          name="context_biases")
 
+            # Declare word embedded wrapper
             focal_embedding = tf.nn.embedding_lookup([focal_embeddings], self.__focal_input)
             context_embedding = tf.nn.embedding_lookup([context_embeddings], self.__context_input)
             focal_bias = tf.nn.embedding_lookup([focal_biases], self.__focal_input)
             context_bias = tf.nn.embedding_lookup([context_biases], self.__context_input)
 
+            # Declare loss and optimizer
             weighting_factor = tf.minimum(
                 1.0,
                 tf.pow(
@@ -126,53 +229,132 @@ class GloVeModel():
 
     def train(self, num_epochs, log_dir=None, summary_batch_interval=1000,
               tsne_epoch_interval=None, savePath=None):
-        should_write_summaries = log_dir is not None and summary_batch_interval
-        should_generate_tsne = log_dir is not None and tsne_epoch_interval
-        batches = self.__prepare_batches()
-        total_steps = 0
-        print "----- Training -----"
-        with tf.Session(graph=self.__graph) as session:
-            if should_write_summaries:
-                summary_writer = tf.train.SummaryWriter(log_dir, graph_def=session.graph_def)
-            tf.initialize_all_variables().run()
-            for epoch in range(num_epochs):
-                shuffle(batches)
-                for batch_index, batch in enumerate(batches):
-                    i_s, j_s, counts = batch
-                    if len(counts) != self.batch_size:
-                        continue
-                    feed_dict = {
-                        self.__focal_input: i_s,
-                        self.__context_input: j_s,
-                        self.__cooccurrence_count: counts}
-                    session.run([self.__optimizer], feed_dict=feed_dict)
-                    if should_write_summaries and (total_steps + 1) % summary_batch_interval == 0:
-                        summary_str = session.run(self.__summary, feed_dict=feed_dict)
-                        summary_writer.add_summary(summary_str, total_steps)
-                    total_steps += 1
-                print "Epoch: ", epoch, "\tloss: ", session.run(self.__total_loss, feed_dict=feed_dict)
-                if should_generate_tsne and (epoch + 1) % tsne_epoch_interval == 0:
-                    current_embeddings = self.__combined_embeddings.eval()
-                    output_path = os.path.join(log_dir, "epoch{:03d}.png".format(epoch + 1))
-                    self.generate_tsne(output_path, embeddings=current_embeddings)
-            self.__embeddings = self.__combined_embeddings.eval()
-            if should_write_summaries:
-                summary_writer.close()
+        """
+            Train model interface
 
-            if not savePath == None:
-                #saver = tf.train.Saver()
-                #saver.save(session, savePath)     
+            Arg:    num_epochs  - The number of training epochs
+                    savePath    - The save path of the embedded
+        """
+        # Check if we want to split training
+        _fileList = os.listdir('./')
+        _count = 0
+        for _fileName in _fileList:
+            if _fileName[:14] == "glove_occ.pkl-":
+                _count += 1
+        if not _count == 0:
+            self.__wantSplit = True
+            self.__numberOfSplitOcc = _count
+
+        # Load training element and build the graph
+        if self.__words == None:
+            self.__words = cPickle.load(open("glove_words.pkl", 'r'))
+        if self.__word_to_id == None:
+            self.__word_to_id = cPickle.load(open("glove_id.pkl", 'r'))
+        self.__build_graph()
+
+        # Train
+        print "<GloVe>-- ", "----- Training -----"
+        self._train(num_epochs, log_dir, summary_batch_interval, tsne_epoch_interval, savePath)
+
+    def _train(self, num_epochs, log_dir=None, summary_batch_interval=1000,
+              tsne_epoch_interval=None, savePath=None):
+        """
+            Train the word embedded
+
+            Arg:    num_epochs  - The number of training epochs
+                    savePath    - The save path of the embedded
+        """
+        global mixTime
+        
+        with tf.Session(graph=self.__graph) as session:
+            tf.initialize_all_variables().run()
+
+            # If we want to seperate or not
+            if self.__wantSplit == False:
+                mixTime = 1
+            for j in range(mixTime):
+                print "<GloVe>-- ", "----- Mix epoch: ", j
+                for i in range(self.__numberOfSplitOcc):
+                    if self.__wantSplit == True:
+                        print "<GloVe>-- ", "----- Load Dataset ", i
+                        self.__cooccurrence_matrix = cPickle.load(open("glove_occ.pkl-"+str(i), 'r'))
+
+                    should_write_summaries = log_dir is not None and summary_batch_interval
+                    should_generate_tsne = log_dir is not None and tsne_epoch_interval
+                    batches = self.__prepare_batches()
+                    total_steps = 0
+                
+                    if should_write_summaries:
+                        summary_writer = tf.train.SummaryWriter(log_dir, graph_def=session.graph_def)
+                    
+                    # For loop training
+                    for epoch in range(num_epochs):
+                        shuffle(batches)
+                        for batch_index, batch in enumerate(batches):
+                            i_s, j_s, counts = batch
+                            if len(counts) != self.batch_size:
+                                continue
+                            feed_dict = {
+                                self.__focal_input: i_s,
+                                self.__context_input: j_s,
+                                self.__cooccurrence_count: counts}
+                            session.run([self.__optimizer], feed_dict=feed_dict)
+                            if should_write_summaries and (total_steps + 1) % summary_batch_interval == 0:
+                                summary_str = session.run(self.__summary, feed_dict=feed_dict)
+                                summary_writer.add_summary(summary_str, total_steps)
+                            total_steps += 1
+                        print "<GloVe>-- ", "Epoch: ", epoch, "\tloss: ", \
+                            session.run(self.__total_loss, feed_dict=feed_dict)
+                        if should_generate_tsne and (epoch + 1) % tsne_epoch_interval == 0:
+                            current_embeddings = self.__combined_embeddings.eval()
+                            output_path = os.path.join(log_dir, "epoch{:03d}.png".format(epoch + 1))
+                            self.generate_tsne(output_path, embeddings=current_embeddings)
+                    self.__embeddings = self.__combined_embeddings.eval()
+                    if should_write_summaries:
+                        summary_writer.close()
+
+            if not savePath == None:    
                 cPickle.dump(self.__embeddings, open(savePath, 'wb'))
 
     def load(self, modelPath):
         """
-        with tf.Session(graph=self.__graph) as session:
-            saver = tf.train.Saver()
-            saver.restore(session, modelPath)
+            Load the word embedded
+            This function can be called individually if you had store the .pkl file
+
+            Arg:    modelPath   - The path of the model which you want to load
         """
+        # Load training element and build the graph
+        if self.__words == None:
+            self.__words = cPickle.load(open("glove_words.pkl", 'r'))
+        if self.__word_to_id == None:
+            self.__word_to_id = cPickle.load(open("glove_id.pkl", 'r'))
+        self.__build_graph()
+
+        # Load word embedded
         self.__embeddings = cPickle.load(open(modelPath, 'rb'))
 
+    def cosSim(self, word_str1_or_id1, word_str2_or_id2):
+        """
+            Return the cosine similarity of the two words
+
+            Arg:    word_str1_or_id1    - The word or the id of the first word
+                    word_str2_or_id2    - The word or the id of the second word
+        """
+        vec1 = self.embedding_for(word_str1_or_id1)
+        vec2 = self.embedding_for(word_str2_or_id2)
+
+        # Compute the length of the vector 1
+        length1 = np.sqrt( np.sum( np.square(vec1) ) )
+        length2 = np.sqrt( np.sum( np.square(vec2) ) )
+        return np.dot(vec1, vec2) / (length1 * length2) 
+
     def embedding_for(self, word_str_or_id):
+        """
+            Return the word vector of the specific word
+
+            Arg:    The word or the id of the word
+            Ret:    The ndarray vector
+        """
         if isinstance(word_str_or_id, str):
             return self.embeddings[self.__word_to_id[word_str_or_id]]
         elif isinstance(word_str_or_id, int):
@@ -229,10 +411,10 @@ def _context_windows(region, left_size, right_size):
 
 def _window(region, start_index, end_index):
     """
-    Returns the list of words starting from `start_index`, going to `end_index`
-    taken from region. If `start_index` is a negative number, or if `end_index`
-    is greater than the index of the last word in region, this function will pad
-    its return value with `NULL_WORD`.
+        Returns the list of words starting from `start_index`, going to `end_index`
+        taken from region. If `start_index` is a negative number, or if `end_index`
+        is greater than the index of the last word in region, this function will pad
+        its return value with `NULL_WORD`.
     """
     last_index = len(region) + 1
     selected_tokens = region[max(start_index, 0):min(end_index, last_index) + 1]
