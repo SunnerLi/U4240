@@ -20,4 +20,5 @@ def dump():
             _string += '\n'
             f.write(_string)
 
-dump()
+if __name__ == "__main__":
+    dump()

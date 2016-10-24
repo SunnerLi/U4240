@@ -8,15 +8,9 @@ import cPickle
 
 # Constant
 MAX = 10000000000000
-<<<<<<< HEAD
-chooseNumber = 1000000  # The number of the common words we want to choose
+chooseNumber = 100000   # The number of the common words we want to choose
 batch_size = 256
 embedding_size = 128    # Dimension of the embedding vector.
-=======
-chooseNumber = 500000   # The number of the common words we want to choose
-batch_size = 256
-embedding_size = 80    # Dimension of the embedding vector.
->>>>>>> 36ba4eeb3dd91f514e2e7128c6d0ec3f2082580e
 skip_window = 1         # How many words to consider left and right.
 num_skips = 2           # How many times to reuse an input to generate a label.
 loss_sum  = 0           # The sum of the loss
@@ -33,28 +27,24 @@ freqs = None            # The frequency of each words
 mapping = dict()        # word  -> index
 batchIndex = 0          # Batch index to generate batch data
 modelName = './model.ckpt'
-<<<<<<< HEAD
-iteration = 20000000
-=======
 iteration = 20
->>>>>>> 36ba4eeb3dd91f514e2e7128c6d0ec3f2082580e
 printThreshold = 2000
 
-graph = tf.Graph()
-
-W = {
+# Tensorflow variable
+graph = tf.Graph()          # graph variable
+W = {                       # The weight
     "word_embedded": None,
     "H": None,
     "nce_weight": None
 }
-B = {
+B = {                       # The bias
     "nce_bias": None
 }
-placeHolder = {
+placeHolder = {             # The place holder
     "X": None,
     "Y": None
 }
-loss = None
+loss = None                 # Loss and optimizer
 optimizer = None
 
 def get(dictionary, value):
@@ -231,7 +221,7 @@ def dumpVector():
 if __name__ == "__main__":
     buildDataset()
     buildTensorflow()
-    #train()
+    train()
     val("is", "are")
     val("is", "have")
     val("have", "has")

@@ -103,9 +103,11 @@ class GloVeModel():
 
         # Split(store) the data or not
         if self.__wantSplit == True:
-            cPickle.dump(self.__words, open("glove_words.pkl", 'w'))
-            cPickle.dump(self.__word_to_id, open("glove_id.pkl", 'w'))
-            cPickle.dump(cooccurrence_counts, open("glove_count.pkl", 'w'))
+            if not os.path.isdir('tmp'):
+                os.mkdir('tmp')
+            cPickle.dump(self.__words, open("./tmp/glove_words.pkl", 'w'))
+            cPickle.dump(self.__word_to_id, open("./tmp/glove_id.pkl", 'w'))
+            cPickle.dump(cooccurrence_counts, open("./tmp/glove_count.pkl", 'w'))
             cooccurrence_counts = None
         else:
             print "<GloVe>-- ", "Co-occurence size: ", len(cooccurrence_counts)
@@ -118,47 +120,50 @@ class GloVeModel():
         """
             Build the co-occurence matrix
         """
-        if os.path.isfile("glove_words.pkl") and os.path.isfile("glove_id.pkl") and os.path.isfile("glove_count.pkl"):
-            # Load the statistic element
-            if self.__words == None:
-                self.__words = cPickle.load(open("glove_words.pkl", 'r'))
-            if self.__word_to_id == None:
-                self.__word_to_id = cPickle.load(open("glove_id.pkl", 'r'))
-            cooccurrence_counts = cPickle.load(open("glove_count.pkl", 'r'))
-            print "<GloVe>-- ", "Co-occurence size: ", len(cooccurrence_counts)
+        if os.path.isdir('tmp'):
+            if os.path.isfile("./tmp/glove_words.pkl") and os.path.isfile("./tmp/glove_id.pkl") and os.path.isfile("./tmp/glove_count.pkl"):
+                # Load the statistic element
+                if self.__words == None:
+                    self.__words = cPickle.load(open("./tmp/glove_words.pkl", 'r'))
+                if self.__word_to_id == None:
+                    self.__word_to_id = cPickle.load(open("./tmp/glove_id.pkl", 'r'))
+                cooccurrence_counts = cPickle.load(open("./tmp/glove_count.pkl", 'r'))
+                print "<GloVe>-- ", "Co-occurence size: ", len(cooccurrence_counts)
 
-            # Statistic the frequency
-            self.__cooccurrence_matrix = dict()
-            storeIndex = 0
-            for words, count in cooccurrence_counts.items():
-                # If the both word is represent, then record the element
-                if words[0] in self.__word_to_id and words[1] in self.__word_to_id:
-                    _key = (self.__word_to_id[words[0]], self.__word_to_id[words[1]])
-                    self.__cooccurrence_matrix[_key] = count
+                # Statistic the frequency
+                self.__cooccurrence_matrix = dict()
+                storeIndex = 0
+                for words, count in cooccurrence_counts.items():
+                    # If the both word is represent, then record the element
+                    if words[0] in self.__word_to_id and words[1] in self.__word_to_id:
+                        _key = (self.__word_to_id[words[0]], self.__word_to_id[words[1]])
+                        self.__cooccurrence_matrix[_key] = count
 
-                    # Clear the whole matrix if it's over limit
-                    if len(self.__cooccurrence_matrix) >= vocabLimit:
-                        _fileName = "glove_occ.pkl-" + str(storeIndex)
-                        print "<GloVe>-- ", "Save " + _fileName
-                        cPickle.dump(self.__cooccurrence_matrix, open(_fileName, 'w'))
-                        self.__cooccurrence_matrix = dict()
-                        if not os.path.isfile(_fileName):
-                            raise SaveFileNotSuccessfulError("didn't save ", _fileName)
-                        storeIndex += 1
+                        # Clear the whole matrix if it's over limit
+                        if len(self.__cooccurrence_matrix) >= vocabLimit:
+                            _fileName = "./tmp/glove_occ.pkl-" + str(storeIndex)
+                            print "<GloVe>-- ", "Save " + _fileName
+                            cPickle.dump(self.__cooccurrence_matrix, open(_fileName, 'w'))
+                            self.__cooccurrence_matrix = dict()
+                            if not os.path.isfile(_fileName):
+                                raise SaveFileNotSuccessfulError("didn't save ", _fileName)
+                            storeIndex += 1
 
-                # Print the progress
-                if len(self.__cooccurrence_matrix) % 500000 == 0:
-                    print "<GloVe>-- ", "Split part: ", storeIndex, \
-                        "\tdict number: ", len(self.__cooccurrence_matrix), "Rest: ", \
-                        max(0, len(cooccurrence_counts) - (storeIndex) * 5000000 - len(self.__cooccurrence_matrix))
+                    # Print the progress
+                    if len(self.__cooccurrence_matrix) % 500000 == 0:
+                        print "<GloVe>-- ", "Split part: ", storeIndex, \
+                            "\tdict number: ", len(self.__cooccurrence_matrix), "Rest: ", \
+                            max(0, len(cooccurrence_counts) - (storeIndex) * 5000000 - len(self.__cooccurrence_matrix))
 
-            # Store the last
-            print "<GloVe>-- ", "Save glove_occ.pkl-"+ str(storeIndex)
-            cPickle.dump(self.__cooccurrence_matrix, open("glove_occ.pkl-" + str(storeIndex), 'w'))
-            self.__cooccurrence_matrix = dict()
-            self.__numberOfSplitOcc = storeIndex+1
+                # Store the last
+                print "<GloVe>-- ", "Save glove_occ.pkl-"+ str(storeIndex)
+                cPickle.dump(self.__cooccurrence_matrix, open("./tmp/glove_occ.pkl-" + str(storeIndex), 'w'))
+                self.__cooccurrence_matrix = dict()
+                self.__numberOfSplitOcc = storeIndex+1
+            else:
+                raise FileNotFoundError("No found the split file, try to train again!")
         else:
-            raise FileNotFoundError("No found the split file, try to train again!")
+            raise FileNotFoundError("No found the tmp folder, try to train again!")
 
 
     def __build_graph(self):
@@ -236,7 +241,7 @@ class GloVeModel():
                     savePath    - The save path of the embedded
         """
         # Check if we want to split training
-        _fileList = os.listdir('./')
+        _fileList = os.listdir('./tmp/')
         _count = 0
         for _fileName in _fileList:
             if _fileName[:14] == "glove_occ.pkl-":
@@ -247,9 +252,9 @@ class GloVeModel():
 
         # Load training element and build the graph
         if self.__words == None:
-            self.__words = cPickle.load(open("glove_words.pkl", 'r'))
+            self.__words = cPickle.load(open("./tmp/glove_words.pkl", 'r'))
         if self.__word_to_id == None:
-            self.__word_to_id = cPickle.load(open("glove_id.pkl", 'r'))
+            self.__word_to_id = cPickle.load(open("./tmp/glove_id.pkl", 'r'))
         self.__build_graph()
 
         # Train
@@ -277,7 +282,7 @@ class GloVeModel():
                 for i in range(self.__numberOfSplitOcc):
                     if self.__wantSplit == True:
                         print "<GloVe>-- ", "----- Load Dataset ", i
-                        self.__cooccurrence_matrix = cPickle.load(open("glove_occ.pkl-"+str(i), 'r'))
+                        self.__cooccurrence_matrix = cPickle.load(open("./tmp/glove_occ.pkl-"+str(i), 'r'))
 
                     should_write_summaries = log_dir is not None and summary_batch_interval
                     should_generate_tsne = log_dir is not None and tsne_epoch_interval
@@ -325,9 +330,9 @@ class GloVeModel():
         """
         # Load training element and build the graph
         if self.__words == None:
-            self.__words = cPickle.load(open("glove_words.pkl", 'r'))
+            self.__words = cPickle.load(open("./tmp/glove_words.pkl", 'r'))
         if self.__word_to_id == None:
-            self.__word_to_id = cPickle.load(open("glove_id.pkl", 'r'))
+            self.__word_to_id = cPickle.load(open("./tmp/glove_id.pkl", 'r'))
         self.__build_graph()
 
         # Load word embedded
