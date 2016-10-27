@@ -9,7 +9,7 @@ import tf_glove as tg
 """
 
 def dump():
-    model = tg.GloVeModel(embedding_size=80, context_size=10, max_vocab_size=100000)
+    model = tg.GloVeModel(embedding_size=80, context_size=10, max_vocab_size=200000)
     model.load("model.pkl")
 
     vocabs = open("fullVocab.txt", 'r').readlines()

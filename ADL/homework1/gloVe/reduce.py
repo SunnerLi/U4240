@@ -6,7 +6,7 @@
     Finish: 23/10/2016
 """
 
-lengthOfRevised = 100000
+lengthOfRevised = 10000000
 
 with open('text8', 'r') as f:
     string = f.read()

@@ -14,7 +14,8 @@ import os
 """
 
 vocabLimit = 5000000        # The number of limit that should save the period result
-mixTime = 1                 # The repeat time that want to eliminate the influence of seperation (Should >= 1)
+mixTime = 5                 # The repeat time that want to eliminate the influence of seperation (Should >= 1)
+cooccurrence_counts = None
 
 class NotTrainedError(Exception):
     pass
@@ -66,7 +67,7 @@ class GloVeModel():
         """
         self.__wantSplit = split
         self.__fit_to_corpus(corpus, self.max_vocab_size, self.min_occurrences, self.left_context, self.right_context)
-        self.__build_graph()
+        #self.__build_graph()
 
     def __fit_to_corpus(self, corpus, vocab_size, min_occurrences, left_size, right_size):
         """
@@ -79,6 +80,7 @@ class GloVeModel():
                     right_size      - The M/2 on the right (half window size)
         """
         # Initialize
+        global cooccurrence_counts
         word_counts = Counter()
         cooccurrence_counts = defaultdict(float)
         
@@ -107,8 +109,9 @@ class GloVeModel():
                 os.mkdir('tmp')
             cPickle.dump(self.__words, open("./tmp/glove_words.pkl", 'w'))
             cPickle.dump(self.__word_to_id, open("./tmp/glove_id.pkl", 'w'))
-            cPickle.dump(cooccurrence_counts, open("./tmp/glove_count.pkl", 'w'))
-            cooccurrence_counts = None
+            #cPickle.dump(cooccurrence_counts, open("./tmp/glove_count.pkl", 'w'))
+            print "<GloVe>-- ", "Write done"
+            #cooccurrence_counts = None
         else:
             print "<GloVe>-- ", "Co-occurence size: ", len(cooccurrence_counts)
             self.__cooccurrence_matrix = {
@@ -127,13 +130,14 @@ class GloVeModel():
                     self.__words = cPickle.load(open("./tmp/glove_words.pkl", 'r'))
                 if self.__word_to_id == None:
                     self.__word_to_id = cPickle.load(open("./tmp/glove_id.pkl", 'r'))
-                cooccurrence_counts = cPickle.load(open("./tmp/glove_count.pkl", 'r'))
+                #cooccurrence_counts = cPickle.load(open("./tmp/glove_count.pkl", 'r'))
                 print "<GloVe>-- ", "Co-occurence size: ", len(cooccurrence_counts)
 
                 # Statistic the frequency
                 self.__cooccurrence_matrix = dict()
                 storeIndex = 0
                 for words, count in cooccurrence_counts.items():
+                    #print "<GloVe>-- ", "Statistic index: ", storeIndex
                     # If the both word is represent, then record the element
                     if words[0] in self.__word_to_id and words[1] in self.__word_to_id:
                         _key = (self.__word_to_id[words[0]], self.__word_to_id[words[1]])

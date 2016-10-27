@@ -14,15 +14,15 @@ import tf_glove as tg
     Finish: 23/10/2016
 """
 
-model = tg.GloVeModel(embedding_size=80, context_size=100, max_vocab_size=100000)
+model = tg.GloVeModel(embedding_size=100, context_size=100, max_vocab_size=100000)
 
 # To statistic the word index in the corpus
 # It's an expensive work, I suggest that you need to do it for once
-model.fit_to_corpus([open('text10', 'r').read().split()], split=True)
+model.fit_to_corpus([open('text8', 'r').read().split()], split=True)
 
 # To record the frequency toward the co-occurence matrix
 # It's an expensive work too, so I suggest that you need to do it for once
 # This function should do after fit_to_corpus done
 model.buils_matrix()
 
-model.train(num_epochs=5, savePath="./model.pkl")
+model.train(num_epochs=50, savePath="./model.pkl")
