@@ -7,7 +7,7 @@ class ArrayLengthNotTheSameError(object):
     pass
 
 # The quadratic circle function
-f = lambda x1, x2: -1 if pow(x1, 2) + pow(x2, 2) - 0.6 >= 0 else 1
+f = lambda x1, x2: 1 if pow(x1, 2) + pow(x2, 2) - 0.6 >= 0 else -1
 
 # The constants
 N = 1000        # The number of points
