@@ -1,87 +1,97 @@
-import tensorflow as tf
 import numpy as np
+import math
 
 """
-    This code solve the problem 20 by tensorflow
-    But the answer is far from the correct answer of others
-    So I might write another new one to vertify the answer
+    This code solve the problem 20
+    The revision is the stotastic gradient decent function
 """
+
+# The activation function
+THETA = lambda x: 1 / (1 + math.exp(-x))    # The sigmoid fundtion
+SIGN  = lambda x: 1 if x >= 0 else -1       # The sign function
+
+# Training constants
+iteration = 2000
+eta = 0.001
 
 # Training data variable
 trainN = 1000
-trainx = np.ndarray([trainN, 20])
-trainy = np.ndarray([trainN, 1])
+trainX = np.ndarray([trainN, 20])
+trainY = np.ndarray([trainN, 1])
 
 # Testing data variable
 testN = 3000
 testX = np.ndarray([testN, 20])
 testY = np.ndarray([testN, 1])
 
-# Training constants
-iteration = 50000
-eta = 0.001
-batchSize = trainN
-
 # The time period to show the loss information
 showLossLimit = 500
 
-if __name__ == "__main__":
-    # Read the data
+# Logistic model
+W = np.zeros([20])
+
+def read():
+    """
+        Read the training data and testing data from file
+    """
+    # Read training data
     with open('hw3_train.dat', 'r') as f:
         for i in range(trainN):
             string = f.readline().split()
-            trainx[i] = np.asarray(string[:-1])
-            trainy[i] = string[-1]
+            trainX[i] = np.asarray(string[:-1])
+            trainY[i] = string[-1]
+
+    # Read testing data
     with open('hw3_test.dat', 'r') as f:
         for i in range(testN):
             string = f.readline().split()
             testX[i] = np.asarray(string[:-1])
             testY[i] = string[-1]
 
-    # Build the graph
-    graph = tf.Graph()
-    with graph.as_default():
-        holderX = tf.placeholder(tf.float32, shape=[batchSize, 20])
-        holderY = tf.placeholder(tf.float32, shape=[batchSize, 1])
-        weight = tf.Variable(tf.random_normal([1, 20]), dtype=tf.float32)
+def stotasticGradient(_x, _y):
+    """
+        Calculate the gradient for the cross entropy
 
-        out = tf.matmul(holderX, tf.transpose(weight))
-        loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(out, holderY))
-        optimizer = tf.train.GradientDescentOptimizer(eta).minimize(loss)
+        Arg:    _x  - The input array
+                _y  - The tag array
+        Ret:    The gradient vector that can be used to revise the model
+    """
+    reviseLength = THETA( -1 * _y[0] * np.dot(_x, W) )
+    reviseDirect = -1 * ( _y * _x )
+    _res = reviseLength * reviseDirect
+    return _res
 
-        _0_1_error = tf.mul(holderY, tf.sign(out))
-        init = tf.initialize_all_variables()
+def train():
+    """
+        Implement model training
+    """
+    global W
+    W = np.zeros([20])
+    for i in range(iteration):
+        _gradSum = np.zeros([20])
+        for j in range(trainN):
+            _grad = stotasticGradient(trainX[j], trainY[j])
+            W = W - eta * _grad
+            _gradSum += _grad
+        if i % showLossLimit == 0:
+            #print "Iter: ", i, "loss: ", np.square(np.sum(_gradSum))
+            pass
 
-    # Tensorflow function
-    with tf.Session(graph=graph) as session:
-        # Train
-        init.run()
-        for i in range(iteration):
-            _, _loss = session.run([optimizer, loss], feed_dict={holderX: trainx, holderY: trainy})
-            if i % showLossLimit == 0:
-                print "Iter: ", i, "\tloss: ", _loss
-            if _loss < 0:
-                break
-        print "----- Q20 -----"
+def test():
+    """
+        Testing by the testing data
 
-        # Validate
-        valid = _0_1_error.eval(feed_dict={holderX: trainx, holderY: trainy})
-        count = 0
-        for i in range(batchSize):
-            if valid[i] == -1:
-                count += 1
-        print "Ein: \t", float(count) / trainN
+        Ret:    The data-out error (Eout)
+    """
+    count = 0.0
+    for index in range(testN):
+        _y = SIGN( np.dot( testX[index], W ) ) 
+        if not testY[index][0] == _y:
+            count += 1
+    return float(count) / testN
 
-        # Test
-        valid1 = _0_1_error.eval(feed_dict={holderX: testX[:1000], holderY: testY[:1000]})
-        valid2 = _0_1_error.eval(feed_dict={holderX: testX[1000:2000], holderY: testY[1000:2000]})
-        valid3 = _0_1_error.eval(feed_dict={holderX: testX[2000:], holderY: testY[2000:]})
-        count = 0
-        for i in range(batchSize):
-            if valid1[i] == -1:
-                count += 1
-            if valid2[i] == -1:
-                count += 1
-            if valid3[i] == -1:
-                count += 1
-        print "Eout: \t", float(count) / testN
+if __name__ == "__main__":
+    print "----- Q20 -----"
+    read()
+    train()
+    print "Eout: ", test()
