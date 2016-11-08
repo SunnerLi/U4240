@@ -2,6 +2,13 @@ import matplotlib.pyplot as plt
 import plotin1 as pi1
 import numpy as np
 
+"""
+    This program would generate three groups of data
+    In each group, it would contain N data point
+    So the total number of data point is 3N
+"""
+
+# The number of data you want to generate
 N = 10
 
 # Step 1. Generate the data
@@ -22,8 +29,6 @@ y3 = np.ones([N]) + 1
 
 x = np.round(np.concatenate((x1, x2, x3)), 2)
 y = np.concatenate((y1, y2, y3))
-print x
-print y
 
 # Step 2. Draw the distribution
 pi1.PointChart(x[:, 0], x[:, 1], y).show()
