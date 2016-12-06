@@ -3,6 +3,14 @@ import numpy as np
 import sys
 
 def returnLoad():
+    """
+        Load the training data, testing data and return the structure
+
+        Ret:    trainX  - The X of the training data
+                trainY  - The Y of the training data
+                testX   - The X of the testing data
+                testY   - The Y of the testing data
+    """
     trainX = np.ndarray([200, 3])
     trainY = np.ndarray([200, 1])
     testX = np.ndarray([1000, 3])
@@ -32,10 +40,24 @@ def returnLoad():
     return trainX, trainY, testX, testY
 
 def regressionWithData(_lambda, x, y):
+    """
+        Implement the linear regression with the specific lambda and data
+
+        Arg:    _lambda - The value of lagrange multiplier
+                x       - The X of the training data
+                y       - The Y of the training data
+    """
     first = np.linalg.inv(np.matmul(np.transpose(x), x) + _lambda * np.eye(np.shape(x)[1]))
     return np.matmul(np.matmul(first, np.transpose(x)), y)
 
 def Err_withData(w, x, y):
+    """
+        Calculate the error rate toward the specific data and model
+
+        Arg:    w   - The weight vector of the model
+                x   - The X of the testing data
+                y   - The Y of the testing data
+    """
     errorCount = 0.0
     for i in range(np.shape(x)[0]):
         result = sign(np.matmul(np.transpose(w), x[i]))
